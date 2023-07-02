@@ -30,11 +30,50 @@ function retrieveMatches() {
 }
 
 function saveMatches(body) {
-    console.log('Retrieved matches: ' + body.length);
+    const now = new Date();
+    console.log(`${now}: Retrieved ${body.length} matches`);
     body.forEach(match => {
-        let matchId = '' + match.id;
-        matches.set(matchId, match);
+        saveMatch(match);
     });
+}
+
+function saveMatch(match) {
+    let matchId = '' + match.id;
+
+    const matchWithOdds = {
+        id : matchId,
+        begin: match.commence_time,
+        home: match.home_team,
+        away: match.away_team,
+        h2h: false
+    }
+
+    if (match.bookmakers && match.bookmakers.length > 0) {
+        const unibet = match.bookmakers.find((bookmaker) => bookmaker.key == 'unibet_eu');
+        if (unibet && unibet.markets && unibet.markets.length > 0) {
+            const h2h = unibet.markets.find((market) => market.key == 'h2h');
+            if (h2h && h2h.outcomes && h2h.outcomes.length > 0) {
+                h2h.outcomes.forEach((outcome) => {
+                   if (outcome.name == matchWithOdds.home) {
+                       matchWithOdds.h2h = true;
+                       matchWithOdds.h2h_1 = outcome.price;
+                   } else if (outcome.name == matchWithOdds.away) {
+                       matchWithOdds.h2h = true;
+                       matchWithOdds.h2h_2 = outcome.price;
+                   } else if (outcome.name == 'Draw') {
+                       matchWithOdds.h2h = true;
+                       matchWithOdds.h2h_X = outcome.price;
+                   } else {
+                       console.log(`Match ${matchId}: h2h unexpected outcome name ${outcome.name} with price ${outcome.price}`);
+                   }
+                });
+                matchWithOdds.h2h = matchWithOdds.h2h_1 && matchWithOdds.h2h_2 && matchWithOdds.h2h_X;
+            }
+        }
+    }
+
+    console.log(matchWithOdds);
+    matches.set(matchId, matchWithOdds);
 }
 
 var period = 60 * 60 * 1000; // X minutes
