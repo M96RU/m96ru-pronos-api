@@ -67,7 +67,7 @@ function saveMatch(match) {
                        console.log(`Match ${matchId}: h2h unexpected outcome name ${outcome.name} with price ${outcome.price}`);
                    }
                 });
-                matchWithOdds.h2h = matchWithOdds.h2h_1 && matchWithOdds.h2h_2 && matchWithOdds.h2h_X;
+                matchWithOdds.h2h = matchWithOdds.h2h_1 > 0 && matchWithOdds.h2h_2 > 0 && matchWithOdds.h2h_X > 0;
             }
         }
     }
