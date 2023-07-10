@@ -1,8 +1,37 @@
 const express = require("express");
-var cors = require('cors');
+const cors = require('cors');
 const app = express();
 app.use(express.json());
 app.use(cors());
+
+const Client = require('pg').Client;
+
+const client = new Client({
+    host: process.env.db_host,
+    port: process.env.db_port,
+    database: process.env.db_schema,
+    user: process.env.db_user,
+    password: process.env.db_pwd,
+});
+
+client.connect();
+
+const create = `
+    CREATE TABLE "matches"
+    (
+        "id"    CHAR(50)         NOT NULL,
+        "begin" TIMESTAMPTZ NULL DEFAULT NULL,
+        "home"  VARCHAR(50)      NOT NULL,
+        "away"  VARCHAR(50)      NOT NULL,
+        "h2h_1" DOUBLE PRECISION NOT NULL,
+        "h2h_x" DOUBLE PRECISION NOT NULL,
+        "h2h_2" DOUBLE PRECISION NOT NULL,
+        PRIMARY KEY ("id")
+    );
+`;
+client.query(create, []).catch(e => {
+    console.log(e);
+});
 
 const fetch = require('node-fetch');
 
@@ -37,15 +66,16 @@ function saveMatches(body) {
     });
 }
 
-function saveMatch(match) {
+async function saveMatch(match) {
     let matchId = '' + match.id;
+    const begin = match.commence_time;
+    const home = match.home_team;
+    const away = match.away_team;
 
-    const matchWithOdds = {
-        id : matchId,
-        begin: match.commence_time,
-        home: match.home_team,
-        away: match.away_team,
-        h2h: false
+    const h2hOdds = {
+        h2h_1 : 0,
+        h2h_x : 0,
+        h2h_2 : 0
     }
 
     if (match.bookmakers && match.bookmakers.length > 0) {
@@ -54,26 +84,27 @@ function saveMatch(match) {
             const h2h = unibet.markets.find((market) => market.key == 'h2h');
             if (h2h && h2h.outcomes && h2h.outcomes.length > 0) {
                 h2h.outcomes.forEach((outcome) => {
-                   if (outcome.name == matchWithOdds.home) {
-                       matchWithOdds.h2h = true;
-                       matchWithOdds.h2h_1 = outcome.price;
-                   } else if (outcome.name == matchWithOdds.away) {
-                       matchWithOdds.h2h = true;
-                       matchWithOdds.h2h_2 = outcome.price;
-                   } else if (outcome.name == 'Draw') {
-                       matchWithOdds.h2h = true;
-                       matchWithOdds.h2h_X = outcome.price;
-                   } else {
-                       console.log(`Match ${matchId}: h2h unexpected outcome name ${outcome.name} with price ${outcome.price}`);
-                   }
+                    if (outcome.name == home) {
+                        h2hOdds.h2h_1 = outcome.price;
+                    } else if (outcome.name == away) {
+                        h2hOdds.h2h_2 = outcome.price;
+                    } else if (outcome.name == 'Draw') {
+                        h2hOdds.h2h_x = outcome.price;
+                    } else {
+                        console.log(`Match ${matchId}: h2h unexpected outcome name ${outcome.name} with price ${outcome.price}`);
+                    }
                 });
-                matchWithOdds.h2h = matchWithOdds.h2h_1 > 0 && matchWithOdds.h2h_2 > 0 && matchWithOdds.h2h_X > 0;
             }
         }
     }
 
-    console.log(matchWithOdds);
-    matches.set(matchId, matchWithOdds);
+    if (h2hOdds.h2h_1 > 0 && h2hOdds.h2h_2 > 0 && h2hOdds.h2h_x > 0) {
+        const text = 'INSERT INTO matches(id, begin, home, away, h2h_1, h2h_x, h2h_2) VALUES($1, $2, $3, $4, $5, $6, $7) ON CONFLICT(id) DO UPDATE SET begin = $2, home = $3, away = $4, h2h_1 = $5, h2h_x = $6, h2h_2 = $7 RETURNING *';
+        const values = [matchId, begin, home, away, h2hOdds.h2h_1, h2hOdds.h2h_x, h2hOdds.h2h_2];
+        const res = await client.query(text, values);
+        console.log(res.rows);
+    }
+
 }
 
 var period = 60 * 60 * 1000; // X minutes
@@ -84,8 +115,14 @@ app.get('/', (req, res) => {
     res.send("Express on Vercel with CORS");
 });
 
-app.get('/api/matches', (req, res) => {
-    res.send(Array.from(matches.values()));
+app.get('/api/matches', async (req, res) => {
+
+    const query = 'SELECT * FROM matches';
+
+    const matches = await client.query(query);
+    console.log(matches);
+
+    res.send(Array.from(matches.rows));
 });
 
 app.listen(5000, () => {
