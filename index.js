@@ -29,7 +29,12 @@ const create = `
         PRIMARY KEY ("id")
     );
 `;
-client.query(create, []).catch(e => {
+
+const drop = `
+    DROP TABLE "matches";
+`;
+
+client.query(drop, []).catch(e => {
     console.log(e);
 });
 
