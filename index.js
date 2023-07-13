@@ -16,31 +16,7 @@ const client = new Client({
 
 client.connect();
 
-const create = `
-    CREATE TABLE "matches"
-    (
-        "id"    CHAR(50)         NOT NULL,
-        "begin" TIMESTAMPTZ NULL DEFAULT NULL,
-        "home"  VARCHAR(50)      NOT NULL,
-        "away"  VARCHAR(50)      NOT NULL,
-        "h2h_1" DOUBLE PRECISION NOT NULL,
-        "h2h_x" DOUBLE PRECISION NOT NULL,
-        "h2h_2" DOUBLE PRECISION NOT NULL,
-        PRIMARY KEY ("id")
-    );
-`;
-
-const drop = `
-    DROP TABLE "matches";
-`;
-
-client.query(drop, []).catch(e => {
-    console.log(e);
-});
-
 const fetch = require('node-fetch');
-
-const matches = new Map();
 
 const url = 'https://odds.p.rapidapi.com/v4/sports/soccer_usa_mls/odds?regions=eu&oddsFormat=decimal&markets=h2h&dateFormat=iso';
 const options = {
@@ -84,16 +60,16 @@ async function saveMatch(match) {
     }
 
     if (match.bookmakers && match.bookmakers.length > 0) {
-        const unibet = match.bookmakers.find((bookmaker) => bookmaker.key == 'unibet_eu');
+        const unibet = match.bookmakers.find((bookmaker) => bookmaker.key === 'unibet_eu');
         if (unibet && unibet.markets && unibet.markets.length > 0) {
-            const h2h = unibet.markets.find((market) => market.key == 'h2h');
+            const h2h = unibet.markets.find((market) => market.key === 'h2h');
             if (h2h && h2h.outcomes && h2h.outcomes.length > 0) {
                 h2h.outcomes.forEach((outcome) => {
-                    if (outcome.name == home) {
+                    if (outcome.name === home) {
                         h2hOdds.h2h_1 = outcome.price;
-                    } else if (outcome.name == away) {
+                    } else if (outcome.name === away) {
                         h2hOdds.h2h_2 = outcome.price;
-                    } else if (outcome.name == 'Draw') {
+                    } else if (outcome.name === 'Draw') {
                         h2hOdds.h2h_x = outcome.price;
                     } else {
                         console.log(`Match ${matchId}: h2h unexpected outcome name ${outcome.name} with price ${outcome.price}`);

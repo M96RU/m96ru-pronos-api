@@ -1,24 +1,65 @@
-const Liquibase = require('node-liquibase').Liquibase;
-const POSTGRESQL_DEFAULT_CONFIG = require('node-liquibase').POSTGRESQL_DEFAULT_CONFIG;
+const path = require("path");
+const fs = require("fs");
+
+const Client = require('pg').Client;
+
+const client = new Client({
+    host: process.env.db_host,
+    port: process.env.db_port,
+    database: process.env.db_schema,
+    user: process.env.db_user,
+    password: process.env.db_pwd,
+});
+
+
 
 async function liquibase() {
 
-    const url = 'jdbc:postgresql://' + process.env.db_host + ':' + process.env.db_port + '/' + process.env.db_schema;
+    console.log('liquibase() begins...');
 
-    const myConfig = {
-        ...POSTGRESQL_DEFAULT_CONFIG,
-        changeLogFile: 'liquibase/changelog.xml',
-        url: url,
-        username: process.env.db_user,
-        password: process.env.db_pwd
+    await client.connect();
+
+    const checkChangeLogTable = `SELECT TABLE_NAME FROM information_schema.tables WHERE TABLE_NAME='db_changelog'`;
+    const res = await client.query(checkChangeLogTable);
+    if (res.rows.length === 0) {
+        console.log('Init db_changelog');
+        const createTable = 'CREATE TABLE "db_changelog" ("filename" VARCHAR(255) NOT NULL,\t"dateexecuted" TIMESTAMPTZ NOT NULL)';
+        await client.query(createTable);
     }
-    const instTs = new Liquibase(myConfig);
 
-    await instTs.update();
+    const path = require('path');
+    const fs = require('fs');
 
-    await instTs.status();
+    const directoryPath = path.join(__dirname, 'changelogs');
+
+    const files = fs.readdirSync(directoryPath)
+    for (index in files) {
+        const filename = files[index];
+        const checkChangeLog = `SELECT * FROM db_changelog WHERE filename='${filename}'`;
+        const checkChangeLogFound = await client.query(checkChangeLog);
+
+        if (checkChangeLogFound.rows.length === 0) {
+            console.log(`execute filename ${filename}...`);
+            const filepath = path.join(directoryPath, filename);
+            const data = fs.readFileSync(filepath, 'utf8');
+            await client.query(data);
+
+            const text = 'INSERT INTO db_changelog(filename, dateexecuted) VALUES($1, $2) RETURNING *';
+            const values = [filename, new Date()];
+            await client.query(text, values);
+
+            console.log(`execute filename ${filename} ok`);
+        }
+    }
+
+    await client.end();
+    console.log('liquibase() done !');
+
 }
 
-liquibase()
-    .then(_ => console.log('done'))
-    .catch(e => console.error(e));
+try {
+    liquibase()
+} catch (e) {
+    console.log(e);
+}
+
