@@ -18,7 +18,7 @@ client.connect();
 
 const fetch = require('node-fetch');
 
-const url = 'https://odds.p.rapidapi.com/v4/sports/soccer_usa_mls/odds?regions=eu&oddsFormat=decimal&markets=h2h&dateFormat=iso';
+const url = 'https://odds.p.rapidapi.com/v4/sports/soccer_china_superleague/odds?regions=eu&oddsFormat=decimal&markets=h2h&dateFormat=iso';
 const options = {
     method: 'GET',
     headers: {
