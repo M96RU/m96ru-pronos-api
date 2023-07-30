@@ -101,7 +101,7 @@ app.get('/', (req, res) => {
 
 app.get('/api/matches', async (req, res) => {
 
-    const query = 'SELECT * FROM matches';
+    const query = 'SELECT * FROM matches ORDER BY begin ASC';
 
     const matches = await client.query(query);
     console.log(matches);
