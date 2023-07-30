@@ -57,9 +57,12 @@ async function liquibase() {
 
 }
 
-try {
-    liquibase()
-} catch (e) {
-    console.log(e);
+module.exports = {
+    run: liquibase
 }
+// try {
+//     liquibase()
+// } catch (e) {
+//     console.log(e);
+// }
 
