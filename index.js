@@ -100,12 +100,12 @@ app.get('/', (req, res) => {
 });
 
 app.get('/api/matches', async (req, res) => {
-
-    const query = 'SELECT * FROM matches ORDER BY begin ASC';
-
-    const matches = await client.query(query);
-    console.log(matches);
-
+    let matchesQuery = 'SELECT * FROM matches ORDER BY begin ASC, id';
+    const userId = req.headers['user-id'];
+    if (userId) {
+        matchesQuery = 'SELECT m.*, b.choice, b.price FROM matches AS m LEFT JOIN bets AS b ON m.id = b.match_id WHERE b.user_id IS NULL OR b.user_id=\'' + userId + '\' ORDER BY begin ASC, m.id';
+    }
+    const matches = await client.query(matchesQuery);
     res.send(Array.from(matches.rows));
 });
 
