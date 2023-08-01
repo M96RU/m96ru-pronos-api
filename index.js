@@ -1,8 +1,11 @@
-const express = require("express");
+const express = require('express');
 const cors = require('cors');
 const app = express();
 app.use(express.json());
 app.use(cors());
+
+const liquibase = require('./liquibase/liquibase');
+liquibase.run();
 
 const Client = require('pg').Client;
 
@@ -54,9 +57,9 @@ async function saveMatch(match) {
     const away = match.away_team;
 
     const h2hOdds = {
-        h2h_1 : 0,
-        h2h_x : 0,
-        h2h_2 : 0
+        h2h_1: 0,
+        h2h_x: 0,
+        h2h_2: 0
     }
 
     if (match.bookmakers && match.bookmakers.length > 0) {
@@ -97,13 +100,28 @@ app.get('/', (req, res) => {
 });
 
 app.get('/api/matches', async (req, res) => {
-
-    const query = 'SELECT * FROM matches';
-
-    const matches = await client.query(query);
-    console.log(matches);
-
+    let matchesQuery = 'SELECT * FROM matches ORDER BY begin ASC, id';
+    const userId = req.headers['user-id'];
+    if (userId) {
+        matchesQuery = 'SELECT m.*, b.choice, b.price FROM matches AS m LEFT JOIN bets AS b ON m.id = b.match_id WHERE b.user_id IS NULL OR b.user_id=\'' + userId + '\' ORDER BY begin ASC, m.id';
+    }
+    const matches = await client.query(matchesQuery);
     res.send(Array.from(matches.rows));
+});
+
+app.post('/api/bets', async (req, res) => {
+    const now = new Date();
+    const userId = req.headers['user-id'];
+    const matchId = req.body.match_id;
+    const choice = req.body.choice;
+    const price = req.body.price;
+
+    const text = 'INSERT INTO bets(match_id, user_id, creation_date, choice, price) VALUES($1, $2, $3, $4, $5) ON CONFLICT(match_id, user_id) DO UPDATE SET choice = $4, price = $5 RETURNING *';
+    const values = [matchId, userId, now, choice, price];
+    const bets = await client.query(text, values);
+    console.log(bets.rows);
+
+    res.send(Array.from(bets.rows));
 });
 
 app.listen(5000, () => {

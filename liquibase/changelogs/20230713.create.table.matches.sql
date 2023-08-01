@@ -1,4 +1,4 @@
-CREATE TABLE "matches"
+CREATE TABLE IF NOT EXISTS "matches"
 (
     "id"    VARCHAR(50)      NOT NULL,
     "begin" TIMESTAMPTZ      NOT NULL,
